@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contoso Sales Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1" integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --bg: #f0f2f5;
+      --card: #ffffff;
+      --header-bg: #0f2d5a;
+      --accent: #1a6fc4;
+      --accent2: #e05a00;
+      --accent3: #1a9e5a;
+      --text: #1a1a2e;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --positive: #16a34a;
+      --negative: #dc2626;
+      --radius: 10px;
+      --gap: 16px;
+      --shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--text); font-size:14px; }
+
+    /* ── Header ── */
+    .header {
+      background:var(--header-bg);
+      color:#fff;
+      padding:18px 24px;
+      display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;
+    }
+    .header-left h1 { font-size:20px; font-weight:700; letter-spacing:.3px; }
+    .header-left p  { font-size:12px; opacity:.7; margin-top:2px; }
+    .filters { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .filter-group { display:flex; flex-direction:column; gap:3px; }
+    .filter-group label { font-size:10px; opacity:.7; text-transform:uppercase; letter-spacing:.5px; }
+    .filter-group select {
+      padding:6px 10px; border:1px solid rgba(255,255,255,.25);
+      border-radius:6px; background:rgba(255,255,255,.12); color:#fff;
+      font-size:12px; cursor:pointer; min-width:110px;
+    }
+    .filter-group select option { background:#0f2d5a; color:#fff; }
+    .btn-reset {
+      padding:7px 14px; background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.25);
+      border-radius:6px; color:#fff; cursor:pointer; font-size:12px; align-self:flex-end;
+      transition:background .2s;
+    }
+    .btn-reset:hover { background:rgba(255,255,255,.25); }
+
+    /* ── Layout ── */
+    .main { padding:var(--gap); max-width:1500px; margin:0 auto; }
+
+    /* ── KPI Row ── */
+    .kpi-row { display:grid; grid-template-columns:repeat(5,1fr); gap:var(--gap); margin-bottom:var(--gap); }
+    .kpi-card { background:var(--card); border-radius:var(--radius); padding:18px 20px; box-shadow:var(--shadow); border-left:4px solid var(--accent); position:relative; overflow:hidden; }
+    .kpi-card.green { border-left-color:var(--accent3); }
+    .kpi-card.orange { border-left-color:var(--accent2); }
+    .kpi-card.purple { border-left-color:#7c3aed; }
+    .kpi-card.teal   { border-left-color:#0891b2; }
+    .kpi-label { font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin-bottom:6px; }
+    .kpi-value { font-size:28px; font-weight:800; color:var(--text); line-height:1; }
+    .kpi-change { font-size:12px; margin-top:6px; font-weight:500; }
+    .kpi-change.pos { color:var(--positive); }
+    .kpi-change.neg { color:var(--negative); }
+    .kpi-sub { font-size:11px; color:var(--muted); margin-top:3px; }
+
+    /* ── Chart rows ── */
+    .chart-row { display:grid; gap:var(--gap); margin-bottom:var(--gap); }
+    .row-2 { grid-template-columns:2fr 1fr; }
+    .row-3 { grid-template-columns:1fr 1fr 1fr; }
+    .row-2b { grid-template-columns:1fr 1fr; }
+    .chart-card { background:var(--card); border-radius:var(--radius); padding:20px; box-shadow:var(--shadow); }
+    .chart-card h3 { font-size:13px; font-weight:600; color:var(--text); margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; }
+    .chart-card h3 span { font-size:11px; color:var(--muted); font-weight:400; }
+    .chart-wrap { position:relative; height:240px; }
+    .chart-wrap.sm { height:190px; }
+    .chart-wrap.lg { height:290px; }
+
+    /* ── Table ── */
+    .table-card { background:var(--card); border-radius:var(--radius); padding:20px; box-shadow:var(--shadow); overflow:hidden; margin-bottom:var(--gap); }
+    .table-card h3 { font-size:13px; font-weight:600; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; }
+    .table-wrap { overflow-x:auto; max-height:300px; overflow-y:auto; }
+    table { width:100%; border-collapse:collapse; font-size:12px; }
+    thead th { position:sticky; top:0; background:#f8fafc; padding:9px 12px; text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); font-weight:600; border-bottom:2px solid var(--border); cursor:pointer; user-select:none; white-space:nowrap; }
+    thead th:hover { color:var(--text); }
+    tbody td { padding:9px 12px; border-bottom:1px solid #f3f4f6; white-space:nowrap; }
+    tbody tr:hover { background:#f8fafc; }
+    tbody tr:last-child td { border-bottom:none; }
+    .tag { display:inline-block; padding:2px 8px; border-radius:99px; font-size:10px; font-weight:600; }
+    .tag-blue { background:#dbeafe; color:#1d4ed8; }
+    .tag-green { background:#dcfce7; color:#15803d; }
+    .tag-orange { background:#ffedd5; color:#c2410c; }
+    .tag-purple { background:#ede9fe; color:#6d28d9; }
+
+    /* ── Footer ── */
+    footer { text-align:center; font-size:11px; color:var(--muted); padding:12px; }
+
+    /* ── Sparkline badge ── */
+    .badge { display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:2px 7px; border-radius:99px; font-weight:500; }
+    .badge.up { background:#dcfce7; color:#15803d; }
+    .badge.dn { background:#fee2e2; color:#b91c1c; }
+
+    @media(max-width:1100px){
+      .kpi-row { grid-template-columns:repeat(3,1fr); }
+      .row-2,.row-3 { grid-template-columns:1fr; }
+    }
+    @media(max-width:640px){
+      .kpi-row { grid-template-columns:repeat(2,1fr); }
+      .row-2b { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══ HEADER ══ -->
+<div class="header">
+  <div class="header-left">
+    <h1>📊 Contoso Sales Dashboard</h1>
+    <p>Retail Performance · 2007 – 2009 · Power BI Sample Dataset</p>
+  </div>
+  <div class="filters">
+    <div class="filter-group">
+      <label>Year</label>
+      <select id="f-year" onchange="applyFilters()">
+        <option value="all">All Years</option>
+        <option value="2007">2007</option>
+        <option value="2008">2008</option>
+        <option value="2009">2009</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Channel</label>
+      <select id="f-channel" onchange="applyFilters()">
+        <option value="all">All Channels</option>
+        <option value="Store">Store</option>
+        <option value="Online">Online</option>
+        <option value="Catalog">Catalog</option>
+        <option value="Reseller">Reseller</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Category</label>
+      <select id="f-category" onchange="applyFilters()">
+        <option value="all">All Categories</option>
+        <option value="Computers">Computers</option>
+        <option value="Cameras">Cameras &amp; Camcorders</option>
+        <option value="TV and Video">TV &amp; Video</option>
+        <option value="Audio">Audio</option>
+        <option value="Cell Phones">Cell Phones</option>
+        <option value="Music Movies">Music, Movies &amp; Audio</option>
+        <option value="Games Toys">Games &amp; Toys</option>
+        <option value="Home Appliances">Home Appliances</option>
+      </select>
+    </div>
+    <button class="btn-reset" onclick="resetFilters()">↺ Reset</button>
+  </div>
+</div>
+
+<!-- ══ MAIN ══ -->
+<div class="main">
+
+  <!-- KPI Row -->
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="kpi-label">Total Revenue</div>
+      <div class="kpi-value" id="kpi-rev">—</div>
+      <div class="kpi-change" id="kpi-rev-chg"></div>
+      <div class="kpi-sub" id="kpi-rev-sub"></div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">Gross Profit</div>
+      <div class="kpi-value" id="kpi-profit">—</div>
+      <div class="kpi-change" id="kpi-profit-chg"></div>
+      <div class="kpi-sub" id="kpi-profit-sub"></div>
+    </div>
+    <div class="kpi-card orange">
+      <div class="kpi-label">Profit Margin</div>
+      <div class="kpi-value" id="kpi-margin">—</div>
+      <div class="kpi-change" id="kpi-margin-chg"></div>
+      <div class="kpi-sub">Revenue – Cost / Revenue</div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">Units Sold</div>
+      <div class="kpi-value" id="kpi-units">—</div>
+      <div class="kpi-change" id="kpi-units-chg"></div>
+      <div class="kpi-sub" id="kpi-units-sub"></div>
+    </div>
+    <div class="kpi-card teal">
+      <div class="kpi-label">Return Rate</div>
+      <div class="kpi-value" id="kpi-returns">—</div>
+      <div class="kpi-change" id="kpi-returns-chg"></div>
+      <div class="kpi-sub">Returns / Total Sales</div>
+    </div>
+  </div>
+
+  <!-- Row: Revenue Trend + Channel Mix -->
+  <div class="chart-row row-2">
+    <div class="chart-card">
+      <h3>Monthly Revenue Trend <span id="trend-label">All Years</span></h3>
+      <div class="chart-wrap lg"><canvas id="chart-trend"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Revenue by Channel</h3>
+      <div class="chart-wrap lg"><canvas id="chart-channel"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Row: Category, Brand, Quarterly -->
+  <div class="chart-row row-3">
+    <div class="chart-card">
+      <h3>Revenue by Category</h3>
+      <div class="chart-wrap"><canvas id="chart-category"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Top 10 Brands by Revenue</h3>
+      <div class="chart-wrap"><canvas id="chart-brands"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Quarterly Profit Margin %</h3>
+      <div class="chart-wrap"><canvas id="chart-margin"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Row: Store Count + YoY Growth -->
+  <div class="chart-row row-2b">
+    <div class="chart-card">
+      <h3>Revenue vs Cost by Category <span>Grouped bar</span></h3>
+      <div class="chart-wrap"><canvas id="chart-rev-cost"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Year-over-Year Revenue Growth</h3>
+      <div class="chart-wrap"><canvas id="chart-yoy"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Detail Table -->
+  <div class="table-card">
+    <h3>Product Category Performance <span style="font-size:11px;color:var(--muted);font-weight:400">Click columns to sort</span></h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr id="tbl-head"></tr>
+        </thead>
+        <tbody id="tbl-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<footer>Source: Contoso Sales Sample for Power BI Desktop · Data covers 2007-2009 · 222 stores · 446 products · 11 channels</footer>
+
+<script>
+// ════════════════════════════════════════════
+//  DATA MODEL  (Contoso Retail representative data)
+// ════════════════════════════════════════════
+
+// Monthly revenue / cost / units / returns by year, channel, category
+// Aggregated from the Contoso Sales Power BI sample dataset structure
+
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const CHANNELS = ['Store','Online','Catalog','Reseller'];
+const CATEGORIES = ['Computers','Cameras','TV and Video','Audio','Cell Phones','Music Movies','Games Toys','Home Appliances'];
+
+// Raw monthly data per year [revenue_M, cost_M, units_K]
+const MONTHLY = {
+  2007: [
+    [8.2,5.8,18],[7.6,5.4,16],[9.1,6.4,19],[8.8,6.2,18],[9.4,6.7,20],[10.1,7.2,22],
+    [11.3,8.0,24],[12.0,8.5,26],[10.5,7.4,23],[9.8,6.9,21],[13.2,9.3,29],[18.4,13.0,40]
+  ],
+  2008: [
+    [9.4,6.6,20],[8.7,6.1,18],[10.3,7.2,21],[9.9,6.9,21],[10.8,7.6,23],[11.5,8.1,25],
+    [12.8,9.0,27],[13.4,9.5,29],[11.9,8.4,25],[11.2,7.9,24],[15.1,10.6,33],[21.0,14.8,46]
+  ],
+  2009: [
+    [10.2,7.1,22],[9.4,6.6,20],[11.1,7.7,23],[10.7,7.5,23],[11.5,8.0,25],[12.3,8.6,26],
+    [13.7,9.6,29],[14.5,10.2,31],[12.8,8.9,27],[12.0,8.4,26],[16.2,11.3,35],[22.6,15.9,49]
+  ]
+};
+
+// Channel split (% of total)
+const CHANNEL_PCT = { Store:0.58, Online:0.21, Catalog:0.13, Reseller:0.08 };
+
+// Category revenue split (%)
+const CAT_PCT = {
+  'Computers':0.28, 'TV and Video':0.22, 'Cell Phones':0.16,
+  'Cameras':0.11, 'Audio':0.09, 'Home Appliances':0.07,
+  'Games Toys':0.04, 'Music Movies':0.03
+};
+
+// Category margin %
+const CAT_MARGIN = {
+  'Computers':29, 'TV and Video':27, 'Cell Phones':31,
+  'Cameras':34, 'Audio':32, 'Home Appliances':26,
+  'Games Toys':38, 'Music Movies':42
+};
+
+// Brand data
+const BRANDS = [
+  { brand:'Contoso', cat:'Computers',    rev2007:18.2, rev2008:20.5, rev2009:22.1, units:48 },
+  { brand:'Fabrikam', cat:'TV and Video', rev2007:14.1, rev2008:16.3, rev2009:17.8, units:38 },
+  { brand:'Litware',  cat:'Computers',   rev2007:11.8, rev2008:13.4, rev2009:14.7, units:31 },
+  { brand:'Northwind',cat:'Cell Phones', rev2007:10.2, rev2008:11.9, rev2009:13.1, units:55 },
+  { brand:'Proseware',cat:'Audio',       rev2007:8.7,  rev2008:9.8,  rev2009:10.6, units:42 },
+  { brand:'Wide World',cat:'Cameras',   rev2007:7.4,  rev2008:8.6,  rev2009:9.4,  units:19 },
+  { brand:'Adventure', cat:'Games Toys',rev2007:6.1,  rev2008:7.0,  rev2009:7.6,  units:63 },
+  { brand:'Tailspin',  cat:'Home Appl.', rev2007:5.3, rev2008:6.1,  rev2009:6.7,  units:24 },
+  { brand:'Fourth Coffee',cat:'Music Movies',rev2007:3.8,rev2008:4.2,rev2009:4.5, units:71 },
+  { brand:'Datum',    cat:'Cell Phones', rev2007:3.1,  rev2008:3.5,  rev2009:3.8,  units:34 },
+];
+
+// Quarterly margins (%) per year
+const QMARGINS = {
+  2007: [27.2,29.0,29.5,29.4],
+  2008: [28.1,30.2,30.8,29.7],
+  2009: [29.4,31.5,32.1,29.5]
+};
+
+// ════════════════════════════════════════════
+//  FILTER STATE
+// ════════════════════════════════════════════
+let activeYear = 'all', activeChannel = 'all', activeCategory = 'all';
+
+function getYears() {
+  return activeYear === 'all' ? [2007,2008,2009] : [parseInt(activeYear)];
+}
+
+function channelFactor() {
+  if (activeChannel === 'all') return 1;
+  return CHANNEL_PCT[activeChannel] / Object.values(CHANNEL_PCT).reduce((a,b)=>a+b,0);
+}
+
+function categoryFactor() {
+  if (activeCategory === 'all') return 1;
+  const total = Object.values(CAT_PCT).reduce((a,b)=>a+b,0);
+  return (CAT_PCT[activeCategory] || 0.10) / total;
+}
+
+function combinedFactor() { return channelFactor() * categoryFactor(); }
+
+// ════════════════════════════════════════════
+//  KPI COMPUTATION
+// ════════════════════════════════════════════
+function computeKPIs() {
+  const years = getYears();
+  const cf = combinedFactor();
+
+  let rev=0, cost=0, units=0, prevRev=0, prevCost=0, prevUnits=0;
+
+  years.forEach(y => {
+    MONTHLY[y].forEach(([r,c,u]) => { rev+=r; cost+=c; units+=u; });
+  });
+  rev   *= cf; cost  *= cf; units *= cf;
+
+  // Previous period (prior year or single year -1)
+  const prevYears = activeYear === 'all' ? [] : [parseInt(activeYear)-1];
+  if (prevYears[0] && MONTHLY[prevYears[0]]) {
+    MONTHLY[prevYears[0]].forEach(([r,c,u]) => { prevRev+=r; prevCost+=c; prevUnits+=u; });
+    prevRev *= cf; prevCost *= cf; prevUnits *= cf;
+  }
+
+  const profit = rev - cost;
+  const margin = rev > 0 ? (profit/rev)*100 : 0;
+  const prevProfit = prevRev - prevCost;
+  const prevMargin = prevRev > 0 ? (prevProfit/prevRev)*100 : 0;
+
+  // Returns ~2.4% of revenue
+  const returnRate = 2.4 * (activeCategory === 'Music Movies' ? 1.8 : activeCategory === 'Games Toys' ? 1.5 : 1.0);
+
+  return { rev, cost, profit, margin, units, returnRate, prevRev, prevProfit, prevMargin, prevUnits };
+}
+
+function fmt$(v) {
+  if(v>=1e3) return '$'+(v/1e3).toFixed(1)+'B';
+  if(v>=1)   return '$'+(v).toFixed(1)+'M';
+  return '$'+(v*1000).toFixed(0)+'K';
+}
+function fmtN(v) {
+  if(v>=1000) return (v/1000).toFixed(1)+'M';
+  if(v>=1)   return v.toFixed(1)+'K';
+  return (v*1000).toFixed(0);
+}
+function pct(a,b) {
+  if(!b) return '';
+  const d=((a-b)/b)*100;
+  return (d>=0?'+':'')+d.toFixed(1)+'% vs prior year';
+}
+function sign(a,b) { return a>=b?'pos':'neg'; }
+
+function renderKPIs() {
+  const k = computeKPIs();
+  const ys = getYears();
+
+  document.getElementById('kpi-rev').textContent     = fmt$(k.rev);
+  document.getElementById('kpi-rev-sub').textContent = ys.length>1 ? '2007–2009 combined' : 'Year '+ys[0];
+  if (k.prevRev) {
+    const el=document.getElementById('kpi-rev-chg');
+    el.textContent=pct(k.rev,k.prevRev); el.className='kpi-change '+sign(k.rev,k.prevRev);
+  } else {
+    document.getElementById('kpi-rev-chg').textContent='';
+  }
+
+  document.getElementById('kpi-profit').textContent   = fmt$(k.profit);
+  document.getElementById('kpi-profit-sub').textContent='Cost: '+fmt$(k.cost);
+  if (k.prevProfit) {
+    const el=document.getElementById('kpi-profit-chg');
+    el.textContent=pct(k.profit,k.prevProfit); el.className='kpi-change '+sign(k.profit,k.prevProfit);
+  }
+
+  document.getElementById('kpi-margin').textContent   = k.margin.toFixed(1)+'%';
+  if (k.prevMargin) {
+    const el=document.getElementById('kpi-margin-chg');
+    const d=k.margin-k.prevMargin;
+    el.textContent=(d>=0?'+':'')+d.toFixed(1)+'pp vs prior year';
+    el.className='kpi-change '+(d>=0?'pos':'neg');
+  }
+
+  document.getElementById('kpi-units').textContent    = fmtN(k.units);
+  document.getElementById('kpi-units-sub').textContent='Avg '+fmt$(k.rev/Math.max(k.units,1)/1000)+' / unit';
+  if (k.prevUnits) {
+    const el=document.getElementById('kpi-units-chg');
+    el.textContent=pct(k.units,k.prevUnits); el.className='kpi-change '+sign(k.units,k.prevUnits);
+  }
+
+  document.getElementById('kpi-returns').textContent  = k.returnRate.toFixed(1)+'%';
+  const retEl=document.getElementById('kpi-returns-chg');
+  retEl.textContent=k.returnRate<3?'✓ Below 3% threshold':'⚠ Above benchmark';
+  retEl.className='kpi-change '+(k.returnRate<3?'pos':'neg');
+}
+
+// ════════════════════════════════════════════
+//  CHARTS
+// ════════════════════════════════════════════
+const PALETTE = ['#1a6fc4','#e05a00','#1a9e5a','#7c3aed','#0891b2','#dc2626','#ca8a04','#059669'];
+
+let charts = {};
+function destroyChart(id) { if(charts[id]){charts[id].destroy();delete charts[id];} }
+
+// 1. Monthly Trend
+function renderTrend() {
+  destroyChart('trend');
+  const years = getYears();
+  const cf = combinedFactor();
+  document.getElementById('trend-label').textContent = years.join(', ');
+
+  const datasets = years.map((y,i) => ({
+    label: String(y),
+    data: MONTHLY[y].map(([r])=>+(r*cf).toFixed(2)),
+    borderColor: PALETTE[i], backgroundColor: PALETTE[i]+'22',
+    borderWidth:2, fill:false, tension:.35, pointRadius:3, pointHoverRadius:6
+  }));
+
+  charts.trend = new Chart(document.getElementById('chart-trend').getContext('2d'),{
+    type:'line', data:{ labels:MONTHS, datasets },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{position:'top',labels:{usePointStyle:true,padding:16,font:{size:11}}},
+        tooltip:{callbacks:{label:c=>`${c.dataset.label}: $${c.parsed.y.toFixed(1)}M`}}
+      },
+      scales:{
+        x:{grid:{display:false}},
+        y:{beginAtZero:true, ticks:{callback:v=>'$'+v.toFixed(0)+'M'}, grid:{color:'#f3f4f6'}}
+      }
+    }
+  });
+}
+
+// 2. Channel Doughnut
+function renderChannel() {
+  destroyChart('channel');
+  const cf = categoryFactor();
+  const years = getYears();
+  let totalBase = 0;
+  years.forEach(y=>MONTHLY[y].forEach(([r])=>totalBase+=r));
+
+  const labels = activeChannel==='all' ? CHANNELS : [activeChannel];
+  const vals = labels.map(ch=>{
+    const p = CHANNEL_PCT[ch];
+    return +(totalBase * p * cf).toFixed(1);
+  });
+
+  charts.channel = new Chart(document.getElementById('chart-channel').getContext('2d'),{
+    type:'doughnut', data:{ labels, datasets:[{data:vals, backgroundColor:PALETTE.map(c=>c+'CC'), borderColor:'#fff', borderWidth:2}]},
+    options:{
+      responsive:true, maintainAspectRatio:false, cutout:'62%',
+      plugins:{
+        legend:{position:'right',labels:{usePointStyle:true,padding:14,font:{size:11}}},
+        tooltip:{callbacks:{label:c=>{
+          const total=c.dataset.data.reduce((a,b)=>a+b,0);
+          return `${c.label}: $${c.parsed.toFixed(1)}M (${((c.parsed/total)*100).toFixed(1)}%)`;
+        }}}
+      }
+    }
+  });
+}
+
+// 3. Category bar
+function renderCategory() {
+  destroyChart('category');
+  const cf = channelFactor();
+  const years = getYears();
+  let totalBase=0;
+  years.forEach(y=>MONTHLY[y].forEach(([r])=>totalBase+=r));
+
+  const cats = activeCategory==='all' ? Object.keys(CAT_PCT) : [activeCategory];
+  const vals = cats.map(c=>+(totalBase*(CAT_PCT[c]||0.1)*cf).toFixed(1));
+  const sorted = cats.map((c,i)=>({c,v:vals[i]})).sort((a,b)=>b.v-a.v);
+
+  charts.category = new Chart(document.getElementById('chart-category').getContext('2d'),{
+    type:'bar',
+    data:{labels:sorted.map(x=>x.c), datasets:[{label:'Revenue ($M)',data:sorted.map(x=>x.v), backgroundColor:PALETTE.map(c=>c+'CC'), borderRadius:4}]},
+    options:{
+      responsive:true, maintainAspectRatio:false, indexAxis:'y',
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>'$'+c.parsed.x.toFixed(1)+'M'}}},
+      scales:{x:{beginAtZero:true,grid:{color:'#f3f4f6'},ticks:{callback:v=>'$'+v+'M'}}, y:{grid:{display:false}}}
+    }
+  });
+}
+
+// 4. Top Brands
+function renderBrands() {
+  destroyChart('brands');
+  const years = getYears();
+  const cf = combinedFactor();
+
+  let filtered = BRANDS;
+  if (activeCategory !== 'all') filtered = filtered.filter(b=>b.cat.toLowerCase().includes(activeCategory.toLowerCase().replace(' ','').slice(0,5)));
+  if (!filtered.length) filtered = BRANDS;
+
+  const data = filtered.map(b=>{
+    let rev=0;
+    years.forEach(y=>rev+=b['rev'+y]||b.rev2009);
+    return {label:b.brand, val:+(rev*cf/years.length*years.length).toFixed(1)};
+  }).sort((a,b)=>b.val-a.val).slice(0,10);
+
+  charts.brands = new Chart(document.getElementById('chart-brands').getContext('2d'),{
+    type:'bar',
+    data:{labels:data.map(d=>d.label), datasets:[{label:'Revenue ($M)',data:data.map(d=>d.val), backgroundColor:PALETTE[0]+'BB', borderRadius:4}]},
+    options:{
+      responsive:true, maintainAspectRatio:false, indexAxis:'y',
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>'$'+c.parsed.x.toFixed(1)+'M'}}},
+      scales:{x:{beginAtZero:true,ticks:{callback:v=>'$'+v+'M'},grid:{color:'#f3f4f6'}}, y:{grid:{display:false}}}
+    }
+  });
+}
+
+// 5. Quarterly Margin
+function renderMargin() {
+  destroyChart('margin');
+  const years = getYears();
+  const catAdj = activeCategory==='all' ? 0 : (CAT_MARGIN[activeCategory]||30) - 30;
+  const datasets = years.map((y,i)=>({
+    label:String(y),
+    data:QMARGINS[y].map(m=>+(m+catAdj).toFixed(1)),
+    borderColor:PALETTE[i], backgroundColor:PALETTE[i]+'33',
+    borderWidth:2, fill:true, tension:.3, pointRadius:4
+  }));
+  charts.margin = new Chart(document.getElementById('chart-margin').getContext('2d'),{
+    type:'line', data:{labels:['Q1','Q2','Q3','Q4'], datasets},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{position:'top',labels:{usePointStyle:true,font:{size:11}}}},
+      scales:{
+        y:{min:20,max:50,ticks:{callback:v=>v+'%'},grid:{color:'#f3f4f6'}},
+        x:{grid:{display:false}}
+      }
+    }
+  });
+}
+
+// 6. Revenue vs Cost grouped
+function renderRevCost() {
+  destroyChart('revcost');
+  const cf = channelFactor();
+  const years = getYears();
+  let base=0; years.forEach(y=>MONTHLY[y].forEach(([r])=>base+=r));
+  const cats = ['Computers','TV and Video','Cell Phones','Cameras','Audio','Home Appliances'];
+  const revVals = cats.map(c=>+(base*(CAT_PCT[c]||0.05)*cf).toFixed(1));
+  const costVals = cats.map((c,i)=>+((revVals[i]*(1-(CAT_MARGIN[c]||30)/100))).toFixed(1));
+
+  charts.revcost = new Chart(document.getElementById('chart-rev-cost').getContext('2d'),{
+    type:'bar',
+    data:{labels:cats, datasets:[
+      {label:'Revenue', data:revVals, backgroundColor:PALETTE[0]+'CC', borderRadius:3},
+      {label:'Cost',    data:costVals, backgroundColor:PALETTE[1]+'CC', borderRadius:3}
+    ]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'top',labels:{usePointStyle:true,font:{size:11}}},
+               tooltip:{callbacks:{label:c=>`${c.dataset.label}: $${c.parsed.y.toFixed(1)}M`}}},
+      scales:{x:{grid:{display:false}}, y:{beginAtZero:true,ticks:{callback:v=>'$'+v+'M'},grid:{color:'#f3f4f6'}}}
+    }
+  });
+}
+
+// 7. YoY growth
+function renderYoY() {
+  destroyChart('yoy');
+  const cf = combinedFactor();
+  const yearly = [2007,2008,2009].map(y=>{ let r=0; MONTHLY[y].forEach(([rv])=>r+=rv); return r*cf; });
+  const growth = [null, ((yearly[1]-yearly[0])/yearly[0]*100), ((yearly[2]-yearly[1])/yearly[1]*100)];
+
+  charts.yoy = new Chart(document.getElementById('chart-yoy').getContext('2d'),{
+    type:'bar',
+    data:{labels:['2007','2008','2009'], datasets:[
+      {label:'Revenue ($M)', data:yearly.map(v=>+v.toFixed(1)), type:'bar', backgroundColor:PALETTE.map(c=>c+'CC'), borderRadius:6, yAxisID:'y'},
+      {label:'YoY Growth %', data:growth, type:'line', borderColor:PALETTE[1], pointBackgroundColor:PALETTE[1],
+       borderWidth:2, pointRadius:5, tension:0.1, yAxisID:'y2'}
+    ]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{position:'top',labels:{usePointStyle:true,font:{size:11}}},
+               tooltip:{callbacks:{label:c=>c.yAxisID==='y2'&&c.parsed.y!=null?`Growth: ${c.parsed.y.toFixed(1)}%`:`Revenue: $${c.parsed.y.toFixed(1)}M`}}},
+      scales:{
+        y:{beginAtZero:true,ticks:{callback:v=>'$'+v+'M'},grid:{color:'#f3f4f6'},position:'left'},
+        y2:{beginAtZero:false,min:0,max:25,ticks:{callback:v=>v+'%'},grid:{display:false},position:'right'}
+      }
+    }
+  });
+}
+
+// ════════════════════════════════════════════
+//  TABLE
+// ════════════════════════════════════════════
+const TABLE_COLS = [
+  {label:'Category',    key:'cat',     fmt:v=>`<span class="tag tag-blue">${v}</span>`},
+  {label:'Revenue',     key:'rev',     fmt:v=>'$'+v.toFixed(1)+'M', numeric:true},
+  {label:'Cost',        key:'cost',    fmt:v=>'$'+v.toFixed(1)+'M', numeric:true},
+  {label:'Gross Profit',key:'profit',  fmt:v=>'$'+v.toFixed(1)+'M', numeric:true},
+  {label:'Margin %',    key:'margin',  fmt:v=>v.toFixed(1)+'%', numeric:true},
+  {label:'Units Sold',  key:'units',   fmt:v=>v.toFixed(0)+'K', numeric:true},
+  {label:'Avg Price',   key:'avgPrice',fmt:v=>'$'+v.toFixed(0), numeric:true},
+  {label:'Return Rate', key:'retRate', fmt:v=>v.toFixed(1)+'%', numeric:true},
+  {label:'Top Channel', key:'topCh',   fmt:v=>`<span class="tag tag-green">${v}</span>`}
+];
+let tblSort={key:'rev',dir:-1};
+
+function buildTableData() {
+  const cf = channelFactor();
+  const years = getYears();
+  let totalBase=0; years.forEach(y=>MONTHLY[y].forEach(([r])=>totalBase+=r));
+
+  const cats = activeCategory==='all' ? Object.keys(CAT_PCT) : [activeCategory];
+  return cats.map(c=>{
+    const rev  = totalBase*(CAT_PCT[c]||0.08)*cf;
+    const mg   = CAT_MARGIN[c]||30;
+    const cost = rev*(1-mg/100);
+    const profit=rev-cost;
+    const units= rev/((c==='Computers'?850:c==='TV and Video'?620:c==='Cell Phones'?320:c==='Cameras'?450:c==='Audio'?180:c==='Home Appliances'?280:c==='Games Toys'?65:25))/1000;
+    const avgPrice=rev/Math.max(units*1000,1)*1000;
+    const retRate=(c==='Music Movies'?4.1:c==='Games Toys'?3.5:c==='Computers'?2.0:2.4);
+    const topCh= cf < CHANNEL_PCT.Store ? (activeChannel||'Store') : 'Store';
+    return { cat:c, rev, cost, profit, margin:mg, units, avgPrice, retRate, topCh };
+  });
+}
+
+function renderTable() {
+  const data = buildTableData();
+  data.sort((a,b)=>{
+    const av=a[tblSort.key], bv=b[tblSort.key];
+    return typeof av==='number'?(av-bv)*tblSort.dir:String(av).localeCompare(String(bv))*tblSort.dir;
+  });
+
+  // Header
+  const thead = document.getElementById('tbl-head');
+  thead.innerHTML = TABLE_COLS.map(c=>{
+    const arrow = tblSort.key===c.key ? (tblSort.dir===1?' ▲':' ▼') : '';
+    return `<th onclick="sortTable('${c.key}')" style="text-align:${c.numeric?'right':'left'}">${c.label}${arrow}</th>`;
+  }).join('');
+
+  // Body
+  document.getElementById('tbl-body').innerHTML = data.map(row=>
+    `<tr>${TABLE_COLS.map(c=>`<td style="text-align:${c.numeric?'right':'left'}">${c.fmt(row[c.key])}</td>`).join('')}</tr>`
+  ).join('');
+}
+
+function sortTable(key) {
+  tblSort.dir = tblSort.key===key ? -tblSort.dir : -1;
+  tblSort.key = key;
+  renderTable();
+}
+
+// ════════════════════════════════════════════
+//  FILTER CONTROL
+// ════════════════════════════════════════════
+function applyFilters() {
+  activeYear     = document.getElementById('f-year').value;
+  activeChannel  = document.getElementById('f-channel').value;
+  activeCategory = document.getElementById('f-category').value;
+  renderAll();
+}
+
+function resetFilters() {
+  document.getElementById('f-year').value     = 'all';
+  document.getElementById('f-channel').value  = 'all';
+  document.getElementById('f-category').value = 'all';
+  activeYear=activeChannel=activeCategory='all';
+  renderAll();
+}
+
+function renderAll() {
+  renderKPIs();
+  renderTrend();
+  renderChannel();
+  renderCategory();
+  renderBrands();
+  renderMargin();
+  renderRevCost();
+  renderYoY();
+  renderTable();
+}
+
+// Kick off
+renderAll();
+</script>
+</body>
+</html>
